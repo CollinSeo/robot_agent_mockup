@@ -1,0 +1,13 @@
+fab,point,time,type,abnormal_type,analysis_log,img_path
+FAB,g_point1,time1,digital,normal,분석 설명,./test_images_gauge/digi_img.jpg
+FAB,g_point1,time2,digital,abnormal,분석 설명,./test_images_gauge/digi_img.jpg
+FAB,g_point1,time3,digital,normal,분석 설명,./test_images_gauge/digi_img.jpg
+FAB,g_point2,time1,digital,normal,분석 설명,./test_images_gauge/digi_img.jpg
+FAB,g_point2,time2,digital,abnormal,분석 설명,./test_images_gauge/digi_img.jpg
+FAB,g_point2,time3,digital,normal,분석 설명,./test_images_gauge/digi_img.jpg
+FAB,g_point3,time1,analog,normal,분석 설명,./test_images_gauge/ana_img.jpg
+FAB,g_point3,time2,analog,abnormal,분석 설명,./test_images_gauge/ana_img.jpg
+FAB,g_point3,time3,analog,normal,분석 설명,./test_images_gauge/ana_img.jpg
+FAB,g_point4,time1,analog,normal,분석 설명,./test_images_gauge/ana_img.jpg
+FAB,g_point4,time2,analog,abnormal,분석 설명,./test_images_gauge/ana_img.jpg
+FAB,g_point4,time3,analog,normal,분석 설명,./test_images_gauge/ana_img.jpg

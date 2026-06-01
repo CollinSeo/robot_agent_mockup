@@ -2,3 +2,4 @@ __pycache__/
 *.py[cod]
 .streamlit/
 .chrome-verify-profile/
+.wl_frames/

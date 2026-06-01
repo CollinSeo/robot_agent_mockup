@@ -1,0 +1,5 @@
+fab,point,time,leak_detection_time_sec,video_path
+FAB,point1,2026-06-02,1,./test_vido_wl/wl_video.mp4
+FAB,point1,2026-06-02,2,./test_vido_wl/wl_video.mp4
+FAB,point1,2026-06-02,3,./test_vido_wl/wl_video.mp4
+FAB,point1,2026-06-02,4,./test_vido_wl/wl_video.mp4
