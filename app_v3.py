@@ -1,5 +1,6 @@
 import base64
 from dataclasses import dataclass
+from datetime import timedelta
 from html import escape
 import json
 import mimetypes
@@ -453,6 +454,7 @@ def load_results(agent_key: str) -> pd.DataFrame:
         )
         df["action_guide"] = "Inspect the detected area and verify leak source immediately."
 
+    df["_time_dt"] = pd.to_datetime(df["time"], errors="coerce")
     df["case_no"] = range(1, len(df) + 1)
     df["case_id"] = (
         df["fab"].astype(str)
@@ -735,6 +737,7 @@ def filter_results(
     selected_fab: str,
     selected_point: str,
     selected_type: str,
+    selected_time_range: tuple | None,
     keyword: str,
 ) -> pd.DataFrame:
     filtered = df.copy()
@@ -744,6 +747,13 @@ def filter_results(
         filtered = filtered[filtered["point"].astype(str) == selected_point]
     if "type" in filtered.columns and selected_type != ALL_OPTION:
         filtered = filtered[filtered["type"].astype(str) == selected_type]
+    if selected_time_range and "_time_dt" in filtered.columns:
+        start_time, end_time = selected_time_range
+        filtered = filtered[
+            filtered["_time_dt"].notna()
+            & (filtered["_time_dt"] >= pd.Timestamp(start_time))
+            & (filtered["_time_dt"] <= pd.Timestamp(end_time))
+        ]
     if keyword.strip():
         keyword_lower = keyword.strip().lower()
         search_columns = [
@@ -767,7 +777,7 @@ def filter_results(
     return filtered
 
 
-def render_filters(df: pd.DataFrame, config: AgentConfig) -> tuple[str, str, str, str]:
+def render_filters(df: pd.DataFrame, config: AgentConfig) -> tuple[str, str, str, tuple | None, str]:
     with st.container(border=True):
         st.markdown('<div class="section-title">Filters</div>', unsafe_allow_html=True)
         cols = st.columns([1, 1, 2], gap="medium")
@@ -791,7 +801,24 @@ def render_filters(df: pd.DataFrame, config: AgentConfig) -> tuple[str, str, str
                 key=f"{config.key}_keyword",
             )
 
-    return selected_fab, selected_point, selected_type, keyword
+        selected_time_range = None
+        time_values = df["_time_dt"].dropna() if "_time_dt" in df.columns else pd.Series(dtype="datetime64[ns]")
+        if not time_values.empty:
+            min_time = time_values.min().to_pydatetime()
+            max_time = time_values.max().to_pydatetime()
+            if min_time == max_time:
+                max_time = min_time + timedelta(minutes=1)
+            selected_time_range = st.slider(
+                "Time range",
+                min_value=min_time,
+                max_value=max_time,
+                value=(min_time, max_time),
+                step=timedelta(minutes=30),
+                format="YYYY-MM-DD HH:mm:ss",
+                key=f"{config.key}_time_range",
+            )
+
+    return selected_fab, selected_point, selected_type, selected_time_range, keyword
 
 
 def render_case_table(filtered: pd.DataFrame, config: AgentConfig) -> pd.Series:
@@ -1068,8 +1095,8 @@ def render_dashboard(config: AgentConfig) -> pd.DataFrame:
 
     render_header(config, total_count=len(df), filtered_count=len(df))
 
-    selected_fab, selected_point, selected_type, keyword = render_filters(df, config)
-    filtered = filter_results(df, selected_fab, selected_point, selected_type, keyword)
+    selected_fab, selected_point, selected_type, selected_time_range, keyword = render_filters(df, config)
+    filtered = filter_results(df, selected_fab, selected_point, selected_type, selected_time_range, keyword)
 
     if filtered.empty:
         st.warning("No cases match the current filters.")
