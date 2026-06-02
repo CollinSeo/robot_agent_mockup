@@ -1,16 +1,17 @@
+import base64
 from dataclasses import dataclass
 from html import escape
+import json
+import mimetypes
 from pathlib import Path
-import shutil
-import subprocess
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 
 ROOT = Path(__file__).parent
 ALL_OPTION = "All"
-FRAME_CACHE_DIR = ROOT / ".wl_frames"
 
 
 @dataclass(frozen=True)
@@ -524,53 +525,15 @@ def resolve_video_path(raw_path: object) -> Path:
     return resolve_file_path(raw_path, (".mp4", ".mov", ".MOV"))
 
 
-def find_ffmpeg_exe() -> str | None:
-    ffmpeg = shutil.which("ffmpeg")
-    if ffmpeg:
-        return ffmpeg
-
-    winget_root = Path.home() / "AppData" / "Local" / "Microsoft" / "WinGet" / "Packages"
-    if winget_root.exists():
-        matches = sorted(winget_root.glob("Gyan.FFmpeg*/*/bin/ffmpeg.exe"))
-        if matches:
-            return str(matches[-1])
-    return None
-
-
 @st.cache_data(show_spinner=False)
-def extract_video_frame(video_path_text: str, seconds: float, case_no: int) -> tuple[str | None, str | None]:
+def video_data_uri(video_path_text: str) -> tuple[str | None, str | None]:
     video_path = resolve_video_path(video_path_text)
     if not video_path.exists():
         return None, f"Video file was not found: {video_path}"
 
-    ffmpeg = find_ffmpeg_exe()
-    if not ffmpeg:
-        return None, "ffmpeg was not found. Install ffmpeg to extract leak frames."
-
-    FRAME_CACHE_DIR.mkdir(exist_ok=True)
-    safe_stem = video_path.stem.replace(" ", "_")
-    frame_path = FRAME_CACHE_DIR / f"{safe_stem}_case_{case_no:03d}_{float(seconds):.2f}s.jpg"
-    if frame_path.exists():
-        return str(frame_path), None
-
-    command = [
-        ffmpeg,
-        "-y",
-        "-ss",
-        str(seconds),
-        "-i",
-        str(video_path),
-        "-frames:v",
-        "1",
-        "-q:v",
-        "2",
-        str(frame_path),
-    ]
-    result = subprocess.run(command, capture_output=True, text=True, check=False)
-    if result.returncode != 0 or not frame_path.exists():
-        detail = result.stderr.strip().splitlines()[-1] if result.stderr.strip() else "Unknown ffmpeg error"
-        return None, f"Could not extract frame at {seconds} sec: {detail}"
-    return str(frame_path), None
+    mime_type = mimetypes.guess_type(video_path.name)[0] or "video/mp4"
+    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
+    return f"data:{mime_type};base64,{encoded}", None
 
 
 def safe_text(value: object) -> str:
@@ -836,18 +799,94 @@ def render_video_case(row: pd.Series) -> None:
     video_path = resolve_video_path(row["video_path"])
     leak_time = float(row["leak_detection_time_sec"])
 
-    st.markdown("**Patrol Video**")
-    if video_path.exists():
-        st.video(str(video_path))
-    else:
+    if not video_path.exists():
         st.error(f"Video file was not found: {video_path}")
+        return
 
-    st.markdown(f"**Detected Frame at {leak_time:g} sec**")
-    frame_path, error = extract_video_frame(str(row["video_path"]), leak_time, int(row["case_no"]))
-    if frame_path:
-        st.image(frame_path, caption=f"Leak detection frame · {leak_time:g} sec", use_container_width=True)
-    else:
-        st.warning(error)
+    data_uri, error = video_data_uri(str(row["video_path"]))
+    if error or not data_uri:
+        st.error(error or "Could not load video.")
+        return
+
+    component_id = f"wl_case_{int(row['case_no'])}"
+    components.html(
+        f"""
+        <div class="wl-viewer">
+            <style>
+                .wl-viewer {{
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                    color: #13202e;
+                }}
+                .wl-label {{
+                    font-size: 14px;
+                    font-weight: 800;
+                    margin: 0 0 8px;
+                }}
+                .wl-muted {{
+                    color: #66778c;
+                    font-size: 12px;
+                    margin: 6px 0 14px;
+                }}
+                .wl-video,
+                .wl-canvas {{
+                    display: block;
+                    width: 100%;
+                    border: 1px solid #d9e1eb;
+                    border-radius: 8px;
+                    background: #0b1220;
+                    box-sizing: border-box;
+                }}
+                .wl-canvas {{
+                    margin-top: 8px;
+                }}
+                .wl-status {{
+                    border: 1px solid #d9e1eb;
+                    border-radius: 8px;
+                    background: #fbfdff;
+                    color: #66778c;
+                    font-size: 13px;
+                    padding: 10px 12px;
+                    margin-top: 8px;
+                }}
+            </style>
+            <p class="wl-label">Patrol Video</p>
+            <video id="{component_id}_video" class="wl-video" controls preload="metadata" src={json.dumps(data_uri)}></video>
+            <p class="wl-muted">The browser captures the leak frame at {leak_time:g} sec. No ffmpeg installation is required.</p>
+            <p class="wl-label">Detected Frame at {leak_time:g} sec</p>
+            <canvas id="{component_id}_canvas" class="wl-canvas"></canvas>
+            <div id="{component_id}_status" class="wl-status">Loading video metadata...</div>
+            <script>
+                const video = document.getElementById("{component_id}_video");
+                const canvas = document.getElementById("{component_id}_canvas");
+                const status = document.getElementById("{component_id}_status");
+                const targetTime = {json.dumps(leak_time)};
+                let captured = false;
+
+                function captureFrame() {{
+                    if (captured || !video.videoWidth || !video.videoHeight) return;
+                    captured = true;
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext("2d");
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    status.textContent = `Captured frame at ${{video.currentTime.toFixed(2)}} sec (${{canvas.width}} x ${{canvas.height}}).`;
+                }}
+
+                video.addEventListener("loadedmetadata", () => {{
+                    const safeTime = Math.min(Math.max(targetTime, 0), Math.max(video.duration - 0.05, 0));
+                    status.textContent = `Seeking to ${{safeTime.toFixed(2)}} sec...`;
+                    video.currentTime = safeTime;
+                }});
+
+                video.addEventListener("seeked", captureFrame);
+                video.addEventListener("error", () => {{
+                    status.textContent = "The browser could not load this video.";
+                }});
+            </script>
+        </div>
+        """,
+        height=780,
+    )
 
 
 def render_selected_case(row: pd.Series, config: AgentConfig) -> None:
