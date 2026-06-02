@@ -780,7 +780,7 @@ def filter_results(
 def render_filters(df: pd.DataFrame, config: AgentConfig) -> tuple[str, str, str, tuple | None, str]:
     with st.container(border=True):
         st.markdown('<div class="section-title">Filters</div>', unsafe_allow_html=True)
-        cols = st.columns([1, 1, 2], gap="medium")
+        cols = st.columns(4, gap="medium")
 
         with cols[0]:
             fab_options = [ALL_OPTION] + sorted(df["fab"].astype(str).unique().tolist())
@@ -792,30 +792,29 @@ def render_filters(df: pd.DataFrame, config: AgentConfig) -> tuple[str, str, str
             selected_point = st.selectbox("Point", point_options, key=f"{config.key}_point")
 
         selected_type = ALL_OPTION
-        keyword_col_index = 2
+        selected_time_range = None
+        time_values = df["_time_dt"].dropna() if "_time_dt" in df.columns else pd.Series(dtype="datetime64[ns]")
+        with cols[2]:
+            if not time_values.empty:
+                min_time = time_values.min().to_pydatetime()
+                max_time = time_values.max().to_pydatetime()
+                if min_time == max_time:
+                    max_time = min_time + timedelta(minutes=1)
+                selected_time_range = st.slider(
+                    "Time range",
+                    min_value=min_time,
+                    max_value=max_time,
+                    value=(min_time, max_time),
+                    step=timedelta(minutes=30),
+                    format="YYYY-MM-DD HH:mm:ss",
+                    key=f"{config.key}_time_range",
+                )
 
-        with cols[keyword_col_index]:
+        with cols[3]:
             keyword = st.text_input(
                 "Search",
                 placeholder="time, type, judgement, log, video path",
                 key=f"{config.key}_keyword",
-            )
-
-        selected_time_range = None
-        time_values = df["_time_dt"].dropna() if "_time_dt" in df.columns else pd.Series(dtype="datetime64[ns]")
-        if not time_values.empty:
-            min_time = time_values.min().to_pydatetime()
-            max_time = time_values.max().to_pydatetime()
-            if min_time == max_time:
-                max_time = min_time + timedelta(minutes=1)
-            selected_time_range = st.slider(
-                "Time range",
-                min_value=min_time,
-                max_value=max_time,
-                value=(min_time, max_time),
-                step=timedelta(minutes=30),
-                format="YYYY-MM-DD HH:mm:ss",
-                key=f"{config.key}_time_range",
             )
 
     return selected_fab, selected_point, selected_type, selected_time_range, keyword
@@ -966,11 +965,6 @@ def render_video_case(row: pd.Series) -> None:
                     font-weight: 800;
                     margin: 0 0 8px;
                 }}
-                .wl-muted {{
-                    color: #66778c;
-                    font-size: 12px;
-                    margin: 6px 0 14px;
-                }}
                 .wl-video,
                 .wl-canvas {{
                     display: block;
@@ -990,15 +984,6 @@ def render_video_case(row: pd.Series) -> None:
                     max-height: 460px;
                     height: auto;
                 }}
-                .wl-status {{
-                    border: 1px solid #d9e1eb;
-                    border-radius: 8px;
-                    background: #fbfdff;
-                    color: #66778c;
-                    font-size: 13px;
-                    padding: 10px 12px;
-                    margin-top: 8px;
-                }}
                 @media (max-width: 900px) {{
                     .wl-grid {{
                         grid-template-columns: 1fr;
@@ -1009,18 +994,15 @@ def render_video_case(row: pd.Series) -> None:
                 <div class="wl-panel">
                     <p class="wl-label">Patrol Video</p>
                     <video id="{component_id}_video" class="wl-video" controls preload="metadata" src={json.dumps(data_uri)}></video>
-                    <p class="wl-muted">The browser captures the leak frame at {leak_time:g} sec. No external video tool is required.</p>
                 </div>
                 <div class="wl-panel">
                     <p class="wl-label">Detected Frame at {leak_time:g} sec</p>
                     <canvas id="{component_id}_canvas" class="wl-canvas"></canvas>
-                    <div id="{component_id}_status" class="wl-status">Loading video metadata...</div>
                 </div>
             </div>
             <script>
                 const video = document.getElementById("{component_id}_video");
                 const canvas = document.getElementById("{component_id}_canvas");
-                const status = document.getElementById("{component_id}_status");
                 const targetTime = {json.dumps(leak_time)};
                 let captured = false;
 
@@ -1031,19 +1013,14 @@ def render_video_case(row: pd.Series) -> None:
                     canvas.height = video.videoHeight;
                     const ctx = canvas.getContext("2d");
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    status.textContent = `Captured frame at ${{video.currentTime.toFixed(2)}} sec (${{canvas.width}} x ${{canvas.height}}).`;
                 }}
 
                 video.addEventListener("loadedmetadata", () => {{
                     const safeTime = Math.min(Math.max(targetTime, 0), Math.max(video.duration - 0.05, 0));
-                    status.textContent = `Seeking to ${{safeTime.toFixed(2)}} sec...`;
                     video.currentTime = safeTime;
                 }});
 
                 video.addEventListener("seeked", captureFrame);
-                video.addEventListener("error", () => {{
-                    status.textContent = "The browser could not load this video.";
-                }});
             </script>
         </div>
         """,
