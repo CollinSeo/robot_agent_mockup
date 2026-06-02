@@ -17,7 +17,7 @@ The project was developed and verified with:
 - Pandas: `2.3.3`
 
 Python package versions are pinned in [requirements.txt](requirements.txt).
-No separate `ffmpeg` installation is required. The Water Leak tab captures the
+No separate video-processing tool installation is required. The Water Leak tab captures the
 target video frame in the browser using HTML5 video and canvas.
 
 ## Project Structure
@@ -164,7 +164,7 @@ Features:
 - Plays the selected patrol video in the dashboard
 - Uses `leak_detection_time_sec` to seek to the detected timestamp
 - Captures and displays the frame in the browser with HTML5 canvas
-- Does not require `ffmpeg` or any external video-processing binary
+- Does not require any external video-processing binary
 - Automatically maps the CSV typo `test_vido_wl` to `test_video_wl`
 - Adds a generated `abnormal_type` value of `water leak` at load time
 

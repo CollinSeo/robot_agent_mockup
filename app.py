@@ -816,6 +816,7 @@ def render_video_case(row: pd.Series) -> None:
                 .wl-viewer {{
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                     color: #13202e;
+                    padding-bottom: 4px;
                 }}
                 .wl-label {{
                     font-size: 14px;
@@ -830,14 +831,24 @@ def render_video_case(row: pd.Series) -> None:
                 .wl-video,
                 .wl-canvas {{
                     display: block;
-                    width: 100%;
                     border: 1px solid #d9e1eb;
                     border-radius: 8px;
                     background: #0b1220;
                     box-sizing: border-box;
                 }}
+                .wl-video {{
+                    width: 100%;
+                    max-height: 360px;
+                    object-fit: contain;
+                }}
                 .wl-canvas {{
+                    width: auto;
+                    max-width: 100%;
+                    max-height: 420px;
+                    height: auto;
                     margin-top: 8px;
+                    margin-left: auto;
+                    margin-right: auto;
                 }}
                 .wl-status {{
                     border: 1px solid #d9e1eb;
@@ -851,7 +862,7 @@ def render_video_case(row: pd.Series) -> None:
             </style>
             <p class="wl-label">Patrol Video</p>
             <video id="{component_id}_video" class="wl-video" controls preload="metadata" src={json.dumps(data_uri)}></video>
-            <p class="wl-muted">The browser captures the leak frame at {leak_time:g} sec. No ffmpeg installation is required.</p>
+            <p class="wl-muted">The browser captures the leak frame at {leak_time:g} sec. No external video tool is required.</p>
             <p class="wl-label">Detected Frame at {leak_time:g} sec</p>
             <canvas id="{component_id}_canvas" class="wl-canvas"></canvas>
             <div id="{component_id}_status" class="wl-status">Loading video metadata...</div>
@@ -885,7 +896,7 @@ def render_video_case(row: pd.Series) -> None:
             </script>
         </div>
         """,
-        height=780,
+        height=920,
     )
 
 
