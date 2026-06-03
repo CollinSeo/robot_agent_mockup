@@ -94,7 +94,6 @@ WATER_LEAK_AGENT = AgentConfig(
         "time",
         "leak_detection_time_sec",
         "abnormal_type",
-        "video_path",
     ],
     media_mode="video",
     point_metric_label="Video Points",
